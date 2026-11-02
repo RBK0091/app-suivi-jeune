@@ -109,6 +109,12 @@ header .sub::first-letter{text-transform:uppercase}
 .tg[aria-pressed="true"]{border-color:var(--omad);background:var(--omad-soft);color:var(--omad-ink);font-weight:600}
 .tg.warn[aria-pressed="true"]{border-color:var(--warn);background:transparent;color:var(--warn)}
 .tg.sport[aria-pressed="true"]{border-color:var(--sport);background:var(--sport-soft);color:var(--sport)}
+.toggles.one{flex-wrap:nowrap;gap:6px}
+.toggles.one .tg{flex:1 1 0;min-width:0;justify-content:center;min-height:42px;padding:6px 8px;font-size:13px;gap:5px;white-space:nowrap}
+.toggles.one .tg svg.i{width:16px;height:16px}
+.toggles.dense .tg svg.i{display:none}
+@media (max-width:380px){.toggles.one .tg svg.i{display:none}}
+@media (max-width:340px){.toggles.one .tg{font-size:12px;padding:6px 4px}}
 .field{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--muted);min-width:0}
 .field input,.addrow input,.sf input,.phase input{min-height:46px;border-radius:14px;border:1px solid var(--line);background:var(--surface2);padding:6px 12px;color:var(--fg);min-width:0;width:100%}
 .meals{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
@@ -308,19 +314,16 @@ function connect(){
 function editor(ds,pre){
   var d=days[ds]||{}, info=dayInfo(ds), date=parseYmd(ds);
   var chips=info&&info.type==='fast'?[['f_ok','Jeûne tenu',0],['f_ko','Jeûne rompu',1]]
-    :info&&info.type==='omad'?[['o1','1 repas (OMAD)',0],['o2','2 repas',1],['o3','Plus',1]]:[];
+    :info&&info.type==='omad'?[['o1','1 repas',0],['o2','2 repas',1],['o3','Plus',1]]:[];
   var meals=d.meals||[], total=meals.reduce(function(a,m){return a+(+m.k||0)},0);
   var label=info?(info.type==='fast'?'Jeûne hydrique':'OMAD')+' · jour '+info.n+'/'+info.total:'Hors programme';
   var cls=info?info.type:'none';
   var showMeals=!(info&&info.type==='fast')||d.st==='f_ko'||meals.length>0;
   var h='<div class="editor" data-date="'+ds+'">';
   if(pre!=='t-')h+='<div class="edhead"><span class="chip '+cls+'">'+label+'</span></div>';
-  if(chips.length){
-    h+='<div class="toggles" role="group" aria-label="Comment ça s\'est passé">';
-    chips.forEach(function(c){h+='<button class="tg'+(c[2]?' warn':'')+'" data-act="st" data-v="'+c[0]+'" aria-pressed="'+(d.st===c[0])+'">'+(c[2]?I.warn:I.ok)+c[1]+'</button>'});
-    h+='</div>';
-  }
-  h+='<div class="toggles"><button class="tg sport" data-act="sport" aria-pressed="'+(!!d.sport)+'">'+I.sport+'Sport fait</button></div>';
+  h+='<div class="toggles one'+(chips.length>2?' dense':'')+'" role="group" aria-label="Comment ça s\'est passé">';
+  chips.forEach(function(c){h+='<button class="tg'+(c[2]?' warn':'')+'" data-act="st" data-v="'+c[0]+'" aria-pressed="'+(d.st===c[0])+'">'+(c[2]?I.warn:I.ok)+c[1]+'</button>'});
+  h+='<button class="tg sport" data-act="sport" aria-pressed="'+(!!d.sport)+'">'+I.sport+'Sport fait</button></div>';
   if(d.sport)h+='<label class="field">Séance (facultatif)<input id="'+pre+'sn" data-f="sn" type="text" value="'+esc(d.sn||'')+'" placeholder="Marche 8 km, salle, vélo…"></label>';
   if(!showMeals){h+='<p class="note">Jour de jeûne : rien à noter côté repas. Si tu as mangé, touche « Jeûne rompu ».</p>';}else{
   h+='<div><div class="eyebrow">Repas</div>';
