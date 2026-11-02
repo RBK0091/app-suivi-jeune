@@ -67,6 +67,7 @@ header .sub::first-letter{text-transform:uppercase}
 .hero.pre{background:var(--surface);border:1px solid var(--line)}
 .hero .tag{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}
 .hero .big{font-family:var(--f-display);font-size:52px;font-weight:700;line-height:1;letter-spacing:-.02em}
+.hero .big.timer{font-size:46px;display:flex;flex-wrap:wrap;align-items:baseline;gap:0 8px}
 .hero .big small{font-size:18px;font-weight:600;letter-spacing:0;opacity:.8;margin-left:6px}
 .hero p{margin:0;opacity:.9}
 .bar{height:10px;border-radius:99px;background:rgba(127,127,127,.28);overflow:hidden}
@@ -236,6 +237,19 @@ function dayInfo(ds){
   var total=Math.max(1,Math.round((p.e-p.s)/DAY));
   return {type:p.type,n:Math.floor((noon-p.s)/DAY)+1,total:total,p:p};
 }
+function clock(ms){
+  ms=Math.max(0,ms); var t=Math.floor(ms/1000);
+  return pad(Math.floor(t/3600))+':'+pad(Math.floor(t%3600/60))+':'+pad(t%60);
+}
+function tick(){
+  var t=document.getElementById('timer'); if(!t)return;
+  var s0=+t.dataset.s, e0=+t.dataset.e, n=Date.now();
+  if(n>=e0){render();return}
+  t.textContent=clock(n-s0);
+  var r=document.getElementById('remain'); if(r)r.textContent=clock(e0-n);
+  var b=document.getElementById('tbar'); if(b)b.style.width=Math.min(100,(n-s0)/(e0-s0)*100)+'%';
+  var d=document.getElementById('tday'); if(d){var dn=Math.floor((n-s0)/DAY)+1,dt=Math.max(1,Math.round((e0-s0)/DAY));d.textContent='Jour '+Math.min(dn,dt)+' sur '+dt}
+}
 function spanDur(ms){
   var d=Math.floor(ms/DAY), h=Math.floor((ms%DAY)/HOUR), m=Math.floor((ms%HOUR)/6e4);
   if(d>0)return d+' j '+h+' h';
@@ -323,9 +337,9 @@ function heroHTML(now){
   var dayN=Math.floor(el/DAY)+1, dayT=Math.max(1,Math.round(tot/DAY));
   var h='<section class="hero '+cp.type+'"><span class="tag">'+(isF?I.drop+'Jeûne hydrique':I.food+'OMAD · un repas par jour')+'</span>';
   if(isF){
-    h+='<div class="big num">'+Math.floor(el/HOUR)+'<small>h sur '+Math.round(tot/HOUR)+' h</small></div>';
-    h+='<div class="bar" role="progressbar" aria-valuenow="'+Math.round(pct)+'" aria-valuemin="0" aria-valuemax="100"><i style="width:'+pct+'%"></i></div>';
-    h+='<div class="row"><span>Jour '+Math.min(dayN,dayT)+' sur '+dayT+'</span><span>Reste '+spanDur(cp.e-now)+'</span></div>';
+    h+='<div class="big timer num"><span id="timer" data-s="'+cp.s.getTime()+'" data-e="'+cp.e.getTime()+'" aria-label="Temps de jeûne écoulé">'+clock(el)+'</span><small>sur '+Math.round(tot/HOUR)+' h</small></div>';
+    h+='<div class="bar" role="progressbar" aria-valuenow="'+Math.round(pct)+'" aria-valuemin="0" aria-valuemax="100"><i id="tbar" style="width:'+pct+'%"></i></div>';
+    h+='<div class="row"><span id="tday">Jour '+Math.min(dayN,dayT)+' sur '+dayT+'</span><span>Reste <span id="remain" class="num">'+clock(cp.e-now)+'</span></span></div>';
     h+='<p>Fin du jeûne : <b>'+sDay(cp.e)+'</b>. Ensuite, '+cfg.omadDays+' jours d\'OMAD.</p>';
   } else {
     h+='<div class="big num">Jour '+Math.min(dayN,dayT)+'<small>sur '+dayT+'</small></div>';
@@ -505,6 +519,7 @@ function saveSettings(){
 
 connect(); render(true);
 setInterval(function(){if(!sheet)render()},60000);
+setInterval(tick,1000);
 })();
 </script>
 
