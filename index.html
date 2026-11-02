@@ -78,8 +78,12 @@ header .sub::first-letter{text-transform:uppercase}
 .btn{min-height:44px;padding:8px 14px;border-radius:12px;border:1px solid currentColor;background:transparent;font-weight:600;font-size:14px}
 .hero.fast .btn{border-color:rgba(255,255,255,.55)}
 .btn.solid{background:var(--fg);color:var(--bg);border-color:var(--fg)}
-.btn.primary{background:var(--fast);color:var(--fast-fg);border-color:var(--fast)}
-.hero.fast .btn.primary{background:#fff;color:var(--fast);border-color:#fff}
+.btn.primary,.hero.fast .btn.primary,.hero.omad .btn.primary{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.ask{font-weight:600;align-self:center}
+.linkbtn{background:none;border:none;text-decoration:underline;font-size:14px;font-weight:600;min-height:44px;padding:0 4px;align-self:flex-start;color:inherit}
+.phase{display:flex;flex-direction:column;gap:8px;padding:12px;border:1px solid var(--line);border-radius:14px}
+.phase.now{border-color:var(--fg)}
+.phase .when2{font-size:13px;color:var(--muted)}
 .hero.omad .btn{border-color:var(--omad);color:var(--omad)}
 details.when{font-size:13px}
 details.when summary{cursor:pointer;min-height:36px;display:flex;align-items:center}
@@ -206,7 +210,7 @@ var days={};
 var dirty=new Set();
 var LS='mon-jeune-v1';
 var tab='today', calY=new Date().getFullYear(), calM=new Date().getMonth();
-var sheet=null, toastTimer=null, pendingRender=false, sync='local';
+var confirmEnd=false, sheet=null, toastTimer=null, pendingRender=false, sync='local';
 var db=null, cfgRef=null, daysCol=null, chain={}, timers={};
 
 try{
@@ -284,6 +288,7 @@ function editor(ds,pre){
   var meals=d.meals||[], total=meals.reduce(function(a,m){return a+(+m.k||0)},0);
   var label=info?(info.type==='fast'?'Jeûne hydrique':'OMAD')+' · jour '+info.n+'/'+info.total:'Hors programme';
   var cls=info?info.type:'none';
+  var showMeals=!(info&&info.type==='fast')||d.st==='f_ko'||meals.length>0;
   var h='<div class="editor" data-date="'+ds+'">';
   h+='<div class="edhead"><span class="chip '+cls+'">'+label+'</span></div>';
   if(chips.length){
@@ -293,6 +298,7 @@ function editor(ds,pre){
   }
   h+='<div class="toggles"><button class="tg sport" data-act="sport" aria-pressed="'+(!!d.sport)+'">'+I.sport+'Sport fait</button></div>';
   if(d.sport)h+='<label class="field">Séance (facultatif)<input id="'+pre+'sn" data-f="sn" type="text" value="'+esc(d.sn||'')+'" placeholder="Marche 8 km, salle, vélo…"></label>';
+  if(!showMeals){h+='<p class="note">Jour de jeûne : rien à noter côté repas. Si tu as mangé, touche « Jeûne rompu ».</p>';}else{
   h+='<div><div class="eyebrow">Repas</div>';
   if(meals.length){
     h+='<ul class="meals">';
@@ -301,6 +307,7 @@ function editor(ds,pre){
   } else h+='<p class="note" style="margin-top:6px">'+(info&&info.type==='fast'?'Jour de jeûne : rien à noter.':'Rien de noté pour ce jour.')+'</p>';
   h+='</div>';
   h+='<div class="addrow"><input id="'+pre+'mn" aria-label="Ce que j\'ai mangé" placeholder="Ce que j\'ai mangé" data-k="mn"><input id="'+pre+'mk" aria-label="Calories" inputmode="numeric" placeholder="kcal" data-k="mk"><button class="btn solid" data-act="addmeal">Ajouter</button></div>';
+  }
   h+='<label class="field">Poids du jour (kg)<input id="'+pre+'w" data-f="w" type="number" inputmode="decimal" step="0.1" min="20" max="400" value="'+(d.w!=null?d.w:'')+'" placeholder="ex. 92,4"></label>';
   return h+'</div>';
 }
@@ -327,10 +334,18 @@ function heroHTML(now){
     h+='<p>Jeûne de '+cfg.fastDays+' jours à partir du <b>'+sDay(cp.e)+'</b>.</p>';
   }
   h+='<div class="adjust">';
-  h+='<button class="btn primary" data-act="endnow">'+(isF?'Rompre le jeûne maintenant':'Lancer le jeûne maintenant')+'</button>';
-  h+='<button class="btn" data-act="shift" data-n="1">+1 jour</button>';
-  h+='<button class="btn" data-act="shift" data-n="-1">−1 jour</button></div>';
-  h+='<details class="when"><summary>Choisir l\'heure de fin</summary><input id="endpick" data-f="setend" type="datetime-local" value="'+toInput(cp.e)+'" aria-label="Fin de la phase"></details>';
+  if(confirmEnd){
+    h+='<span class="ask">'+(isF?'Rompre le jeûne maintenant ?':'Lancer le jeûne maintenant ?')+'</span><button class="btn primary" data-act="endyes">Oui</button><button class="btn" data-act="endno">Non</button>';
+  } else {
+    h+='<button class="btn primary" data-act="endask">'+(isF?'Rompre le jeûne maintenant':'Lancer le jeûne maintenant')+'</button>';
+    if(!isF){h+='<button class="btn" data-act="shift" data-n="1">+1 jour</button><button class="btn" data-act="shift" data-n="-1">−1 jour</button>'}
+  }
+  h+='</div>';
+  var prev=P[cp.i-1];
+  if(!isF&&prev&&cfg.dur[prev.i]!=null&&(prev.e-prev.s)<cfg.fastDays*DAY-HOUR&&el<2*DAY){
+    h+='<button class="btn" data-act="resume">Oups, reprendre le jeûne</button>';
+  }
+  h+='<button class="linkbtn" data-act="plan">Corriger le planning</button>';
   return h+'</section>';
 }
 
@@ -382,6 +397,21 @@ function settingsHTML(){
   +'<button class="btn solid" data-act="savecfg">Enregistrer</button></div>';
 }
 
+function planHTML(){
+  build(); var now=new Date(), cp=phaseAt(now), idx=cp?cp.i:0, from=Math.max(0,idx-1);
+  var h='<div class="sheethead"><h2>Corriger le planning</h2><button class="iconbtn" data-act="close" aria-label="Fermer">×</button></div>';
+  h+='<p class="note">Change la date de fin d\'une phase : toutes les suivantes se décalent toutes seules.</p>';
+  for(var k=from;k<from+4&&k<P.length;k++){
+    var p=P[k], isNow=cp&&p.i===cp.i, n=Math.round((p.e-p.s)/DAY);
+    h+='<div class="phase'+(isNow?' now':'')+'"><div><span class="chip '+p.type+'">'+(p.type==='fast'?'Jeûne hydrique':'OMAD')+(isNow?' · en cours':'')+'</span></div>';
+    h+='<div class="when2">Début : '+sDay(p.s)+' · durée '+n+' j</div>';
+    h+='<label class="field">Fin<input id="pe'+p.i+'" data-f="planend" data-i="'+p.i+'" type="datetime-local" value="'+toInput(p.e)+'"></label>';
+    if(cfg.dur[p.i]!=null)h+='<button class="btn" data-act="resetdur" data-i="'+p.i+'">Remettre la durée prévue ('+(p.type==='fast'?cfg.fastDays:cfg.omadDays)+' j)</button>';
+    h+='</div>';
+  }
+  return h;
+}
+
 function render(force){
   var ae=document.activeElement;
   if(!force&&ae&&(ae.tagName==='INPUT')&&document.getElementById('app').contains(ae)||!force&&ae&&ae.tagName==='INPUT'&&document.getElementById('sheet').contains(ae)){pendingRender=true;return}
@@ -396,7 +426,8 @@ function render(force){
     if(sheet.type==='day'){
       var info=dayInfo(sheet.date);
       s.innerHTML='<div class="sheethead"><h2>'+fr(parseYmd(sheet.date),{weekday:'long',day:'numeric',month:'long'})+'</h2><button class="iconbtn" data-act="close" aria-label="Fermer">×</button></div>'+editor(sheet.date,'s-');
-    } else s.innerHTML=settingsHTML();
+    } else if(sheet.type==='plan'){s.innerHTML=planHTML()}
+    else s.innerHTML=settingsHTML();
   } else {w.hidden=true;s.innerHTML=''}
 }
 
@@ -404,7 +435,7 @@ function toast(msg,undo){
   var t=document.getElementById('toast');
   t.innerHTML='<span>'+esc(msg)+'</span>'+(undo?'<button data-act="undo">Annuler</button>':'');
   t.hidden=false; clearTimeout(toastTimer);
-  toastTimer=setTimeout(function(){t.hidden=true},6000);
+  toastTimer=setTimeout(function(){t.hidden=true},10000);
   toast.undo=undo;
 }
 
@@ -431,7 +462,12 @@ document.addEventListener('click',function(ev){
   else if(a==='st'){setDay(ds,function(d){d.st=d.st===el.dataset.v?null:el.dataset.v});render(true)}
   else if(a==='delmeal'){setDay(ds,function(d){d.meals.splice(+el.dataset.i,1)});render(true)}
   else if(a==='addmeal'){addMeal(el.closest('.editor'))}
-  else if(a==='endnow'){var p=curPhase();if(p)setEnd(p,new Date(),p.type==='fast'?'Jeûne terminé. Le calendrier est recalculé.':'Jeûne lancé. Le calendrier est recalculé.')}
+  else if(a==='endask'){confirmEnd=true;render(true)}
+  else if(a==='endno'){confirmEnd=false;render(true)}
+  else if(a==='endyes'){confirmEnd=false;var p=curPhase();if(p)setEnd(p,new Date(),p.type==='fast'?'Jeûne terminé. Le calendrier est recalculé.':'Jeûne lancé. Le calendrier est recalculé.')}
+  else if(a==='resume'){var c=curPhase();var pv=c&&P[c.i-1];if(pv){var old=cfg.dur[pv.i];delete cfg.dur[pv.i];saveCfg();render(true);toast('Jeûne repris. Le planning est rétabli.',function(){cfg.dur[pv.i]=old;saveCfg();render(true)})}}
+  else if(a==='plan'){sheet={type:'plan'};render(true)}
+  else if(a==='resetdur'){var i=+el.dataset.i,od=cfg.dur[i];delete cfg.dur[i];saveCfg();render(true);toast('Durée prévue rétablie.',function(){cfg.dur[i]=od;saveCfg();render(true)})}
   else if(a==='shift'){var q=curPhase();if(q){var n=+el.dataset.n;setEnd(q,addDays(q.e,n),(n>0?'Phase prolongée':'Phase raccourcie')+' d\'un jour. Les suivantes sont décalées.')}}
   else if(a==='undo'){if(toast.undo)toast.undo();document.getElementById('toast').hidden=true}
   else if(a==='savecfg'){saveSettings()}
@@ -451,6 +487,7 @@ document.addEventListener('change',function(ev){
   var el=ev.target, f=el.dataset&&el.dataset.f; if(!f)return;
   if(f==='w'){var ds=ctxDate(el),v=parseFloat(String(el.value).replace(',','.'));setDay(ds,function(d){if(isNaN(v))delete d.w;else d.w=v})}
   else if(f==='sn'){setDay(ctxDate(el),function(d){d.sn=el.value.trim()})}
+  else if(f==='planend'){build();var pp=P[+el.dataset.i];var ne2=new Date(el.value);if(pp&&el.value&&!isNaN(ne2)){if(ne2<=pp.s){toast('La fin doit être après le début.');render(true)}else setEnd(pp,ne2,'Fin ajustée. Les phases suivantes sont décalées.')}}
   else if(f==='setend'){var p=curPhase();if(p&&el.value){var ne=new Date(el.value);if(!isNaN(ne))setEnd(p,ne,'Fin ajustée. Les phases suivantes sont décalées.')}}
 });
 document.addEventListener('focusout',function(){setTimeout(function(){var a=document.activeElement;if(pendingRender&&(!a||a.tagName!=='INPUT'))render()},50)});
